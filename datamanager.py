@@ -4,7 +4,7 @@ import googlemaps
 import json
 from Spinner import Spinner
 
-api_key = 'AIzaSyBrPPVd_WgScTeSA66YRNYZkqu7HZE4kNk'
+api_key = 'AIzaSyDWe67VvbE-aTyPUm8oOun87Xg1-KmezFU'
 
 
 def __init__():
