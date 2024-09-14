@@ -1,0 +1,10 @@
+flask
+flask_cors
+flask_apscheduler
+requests
+pyzipcode
+pandas
+googlemaps
+datetime
+geopy
+gunicorn==20.1.0

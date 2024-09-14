@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pickleball Tournaments Near Me</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/15.5.0/nouislider.min.css" />
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+        #map {
+            height: 100vh;
+            width: 100vw;
+        }
+        .overlay {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            display: flex;
+            flex-direction: column;
+        }
+        h1 {
+            position: absolute;
+            top: 20px;
+            width: 100%;
+            text-align: center;
+            margin: 0;
+            color: #333;
+            text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.7);
+        }
+        .overlay input[type="text"], .overlay input[type="date"], .overlay select {
+            width: 100%;
+            max-width: 200px;
+            padding: 10px;
+            margin: 5px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            box-sizing: border-box;
+            font-size: 14px;
+            background: #fff;
+        }
+        .overlay .slider {
+            width: 90%;
+            margin: 10px 0;
+        }
+        .overlay button {
+            padding: 12px 24px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px;
+        }
+        .overlay button:hover {
+            background-color: #0056b3;
+        }
+        .overlay .checkbox-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-top: 10px;
+        }
+        .overlay .checkbox-container label {
+            margin-left: 5px;
+            font-size: 15px;
+        }
+        .overlay .form-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .overlay .form-row {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+        }
+        .overlay .dropdown-search-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .overlay .skill-level-container {
+            margin-right: 10px;
+        }
+        /* Adjustments for mobile support */
+        @media screen and (max-width: 768px) {
+            .overlay input[type="text"], .overlay input[type="date"], .overlay select {
+                width: 90%;
+            }
+            .overlay .slider-container {
+                flex-direction: column;
+            }
+            .overlay .slider {
+                margin: 0 0 10px 0;
+            }
+            .overlay button {
+                padding: 10px 20px;
+                margin: 5px;
+            }
+            .overlay .form-row {
+                flex-direction: column;
+            }
+            .overlay .dropdown-search-container {
+                flex-direction: column;
+            }
+        }
+    </style>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBrPPVd_WgScTeSA66YRNYZkqu7HZE4kNk&callback=initMap" async defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/15.5.0/nouislider.min.js"></script>
+</head>
+<body>
+    <h1>Pickleball Tournaments Near Me</h1>
+    <div id="map"></div>
+    <div class="overlay">
+        <form id="inputForm">
+            <div class="form-group">
+                <div class="form-row">
+                    <input type="text" id="zipcode" name="zipcode" placeholder="Enter your location" required>
+                    <input type="text" id="distance" name="distance" placeholder="Enter a distance (in miles)" required>
+                </div>
+                <div class="form-row">
+                    <input type="date" id="start-date" name="start-date" required>
+                    <input type="date" id="end-date" name="end-date" required>
+                </div>
+                <div class="slider" id="date-slider"></div>
+                <div class="dropdown-search-container">
+                    <div class="skill-level-container">
+                        <select id="skill-level" name="skill-level" required>
+                            <option value="" disabled selected>Skill Level</option>
+                            <option value="any">Any</option>
+                            <option value="3.0">3.0</option>
+                            <option value="3.5">3.5</option>
+                            <option value="4.0">4.0</option>
+                            <option value="4.5">4.5</option>
+                            <option value="5.0">5.0</option>
+                            <option value="pro">Pro</option>
+                        </select>
+                    </div>
+                    <button type="submit">Search</button>
+                    <div class="checkbox-container">
+                        <input type="checkbox" id="sanctioned_only" name="sanctioned_only">
+                        <label for="sanctioned_only">Sanctioned Only</label>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        let map;
+        let currentInfoWindow = null;
+        let markers = [];
+
+        function initMap() {
+            map = new google.maps.Map(document.getElementById('map'), {
+                zoom: 4,
+                center: { lat: 39.8283, lng: -98.5795 } // Center of the US
+            });
+        }
+
+        document.getElementById('inputForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            clearMarkers();
+            const zipcode = document.getElementById('zipcode').value;
+            const distance = document.getElementById('distance').value;
+            const startDate = document.getElementById('start-date').value;
+            const endDate = document.getElementById('end-date').value;
+            const sanctioned = document.getElementById('sanctioned_only').checked;
+            const skillLevel = document.getElementById('skill-level').value;
+
+            const response = await fetch('/process', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ zipcode, distance, startDate, endDate, sanctioned, skillLevel })
+            });
+
+            const result = await response.json();
+            displayLocations(result.locations);
+        });
+
+        function getMarkerSize(registeredPlayers) {
+            const minSize = 30;
+            const maxSize = 120;
+            const maxPlayers = 800;
+            const size = Math.min(maxSize, minSize + (registeredPlayers / maxPlayers) * (maxSize - minSize));
+            return new google.maps.Size(size, size);
+        }
+
+        function displayLocations(locations) {
+            locations.forEach(location => {
+                const markerSize = getMarkerSize(location.registered_players);
+                const markerIcon = {
+                    url: 'https://www.pinclipart.com/picdir/big/110-1108602_havent-tried-pickleball-yet-want-to-get-more.png', // You can use a different image URL
+                    scaledSize: markerSize,
+                    anchor: new google.maps.Point(markerSize.width / 2, markerSize.height / 2)
+                };
+
+                const marker = new google.maps.Marker({
+                    position: location.coordinates,
+                    map: map,
+                    title: location.title,
+                    icon: markerIcon
+                });
+
+                const infowindow = new google.maps.InfoWindow({
+                    content: `
+                        <div style="width: 350px;">
+                            <h3 style="margin-top: 0;">${location.title}</h3>
+                            <img src="${location.image}" alt="${location.title}" style="float: left; margin-right: 10px; width: 80px; height: auto;">
+                            <p><strong>Date:</strong> ${location.date}</p>
+                            <p><strong>Registered Players:</strong> ${location.registered_players}</p>
+                            <p>${location.address}</p>
+                            <a href="${location.link}" target="_blank">More Info</a>
+                        </div>`
+                });
+
+                marker.addListener('click', function() {
+                    if (currentInfoWindow) {
+                        currentInfoWindow.close();
+                    }
+                    infowindow.open(map, marker);
+                    currentInfoWindow = infowindow;
+                });
+
+                markers.push(marker);
+            });
+        }
+
+        function clearMarkers() {
+            for (let marker of markers) {
+                marker.setMap(null);
+            }
+            markers = [];
+        }
+
+        function updateDateInputs(values, startDateElement, endDateElement, baseDate) {
+            const [startDateOffset, endDateOffset] = values.map(value => parseInt(value, 10));
+
+            const startDate = new Date(baseDate);
+            startDate.setDate(startDate.getDate() + startDateOffset);
+            startDateElement.value = startDate.toISOString().split('T')[0];
+
+            const endDate = new Date(baseDate);
+            endDate.setDate(endDate.getDate() + endDateOffset);
+            endDateElement.value = endDate.toISOString().split('T')[0];
+        }
+
+        function updateDateRangeInputs() {
+            const startDate = new Date();
+            const endDate = new Date();
+            endDate.setFullYear(endDate.getFullYear() + 1);
+
+            const dateSlider = document.getElementById('date-slider');
+            const startDateInput = document.getElementById('start-date');
+            const endDateInput = document.getElementById('end-date');
+
+            noUiSlider.create(dateSlider, {
+                start: [0, 365],
+                connect: true,
+                range: {
+                    min: 0,
+                    max: 365
+                },
+                tooltips: false,
+                format: {
+                    to: value => Math.round(value),
+                    from: value => Number(value)
+                }
+            });
+
+            dateSlider.noUiSlider.on('update', (values) => {
+                updateDateInputs(values, startDateInput, endDateInput, startDate);
+            });
+
+            startDateInput.value = startDate.toISOString().split('T')[0];
+            endDateInput.value = endDate.toISOString().split('T')[0];
+
+            startDateInput.addEventListener('change', () => {
+                const inputDate = new Date(startDateInput.value);
+                const offset = Math.round((inputDate - startDate) / (1000 * 60 * 60 * 24));
+                dateSlider.noUiSlider.set([offset, null]);
+            });
+
+            endDateInput.addEventListener('change', () => {
+                const inputDate = new Date(endDateInput.value);
+                const offset = Math.round((inputDate - startDate) / (1000 * 60 * 60 * 24));
+                dateSlider.noUiSlider.set([null, offset]);
+            });
+        }
+
+        window.onload = updateDateRangeInputs;
+    </script>
+</body>
+</html>
