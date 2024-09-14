@@ -14,7 +14,7 @@ scheduler.init_app(app)
 scheduler.start()
 
 # Initialize Google Maps API client
-api_key = 'AIzaSyBrPPVd_WgScTeSA66YRNYZkqu7HZE4kNk'
+api_key = 'AIzaSyDWe67VvbE-aTyPUm8oOun87Xg1-KmezFU'
 gmaps = googlemaps.Client(key=api_key)
 
 @app.route('/')
