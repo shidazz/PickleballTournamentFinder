@@ -75,5 +75,5 @@ with requests.Session() as s:
             "tourneyId": event_id
         }
 
-        r = s.get(f'{base_url_2}/api/tourneys/getFormattedEvents?tourneyId={event_id}&activityId=&playerName=', json=event_request)
+        r = s.get(f'{base_url_2}/tournaments/api/tourneyEvents?slug={event_id}', json=event_request)
         return r.json()

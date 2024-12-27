@@ -18,9 +18,53 @@
         .overlay {
             position: absolute;
             bottom: 20px;
-            left: 20px;
+            left: 50px; /* Adjusted for spacing from the bar */
             display: flex;
             flex-direction: column;
+            transition: transform 0.3s ease, opacity 0.3s ease;
+            opacity: 1;
+            z-index: 1; /* Ensure the overlay is under the toggle bar */
+        }
+        .overlay.hidden {
+            transform: translateX(-100%);
+            opacity: 0;
+            pointer-events: none;
+        }
+        #toggle-bar {
+            position: absolute;
+            left: 0;
+            bottom: 30px; /* Matches the bottom alignment of the overlay */
+            width: 25px;
+            height: 200px;
+            background-color: #007bff;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            border-top-right-radius: 5px;
+            border-bottom-right-radius: 5px;
+            user-select: none;
+            z-index: 2; /* Ensure the toggle bar is above everything */
+        }
+        #loading {
+            position: absolute;
+            bottom: 80px;
+            left: 80px;
+            display: none;
+            z-index: 3;
+        }
+        .spinner {
+            border: 8px solid #f3f3f3;
+            border-top: 8px solid #007bff;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
         h1 {
             position: absolute;
@@ -87,7 +131,24 @@
         .overlay .skill-level-container {
             margin-right: 10px;
         }
-        /* Adjustments for mobile support */
+        .overlay .image-container {
+            text-align: center;
+            margin-bottom: 5px;
+        }
+        .overlay .clickable-image {
+            max-width: 100%;
+            width: 200px;
+            height: auto;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: transform 0.3s ease;
+            margin-left: -10px;
+        }
+
+        .overlay .clickable-image:hover {
+            transform: scale(1.05);
+        }
+
         @media screen and (max-width: 768px) {
             .overlay input[type="text"], .overlay input[type="date"], .overlay select {
                 width: 90%;
@@ -116,8 +177,16 @@
 <body>
     <h1>Pickleball Tournaments Near Me</h1>
     <div id="map"></div>
-    <div class="overlay">
+    <div id="toggle-bar">☰</div>
+    <div id="loading"><div class="spinner"></div></div>
+    <div class="overlay" id="overlay">
         <form id="inputForm">
+            <div class="image-container">
+                <a href="https://www.selkirk.com?sca_ref=7289579.spPkf3NQfC" target="_blank">
+                    <img src="/static/Selkirk-Logo-2-3.png" alt="Pickleball Gear" class="clickable-image">
+                </a>
+            </div>
+
             <div class="form-group">
                 <div class="form-row">
                     <input type="text" id="zipcode" name="zipcode" placeholder="Enter your location" required>
@@ -130,7 +199,7 @@
                 <div class="slider" id="date-slider"></div>
                 <div class="dropdown-search-container">
                     <div class="skill-level-container">
-                        <select id="skill-level" name="skill-level" required>
+                        <select id="skill-level" name="skill-level">
                             <option value="" disabled selected>Skill Level</option>
                             <option value="any">Any</option>
                             <option value="3.0">3.0</option>
@@ -142,10 +211,6 @@
                         </select>
                     </div>
                     <button type="submit">Search</button>
-                    <div class="checkbox-container">
-                        <input type="checkbox" id="sanctioned_only" name="sanctioned_only">
-                        <label for="sanctioned_only">Sanctioned Only</label>
-                    </div>
                 </div>
             </div>
         </form>
@@ -155,6 +220,38 @@
         let map;
         let currentInfoWindow = null;
         let markers = [];
+        const toggleBar = document.getElementById('toggle-bar');
+        const overlay = document.getElementById('overlay');
+        const loading = document.getElementById('loading');
+
+        toggleBar.addEventListener('click', () => {
+            overlay.classList.toggle('hidden');
+        });
+
+        document.getElementById('inputForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            overlay.classList.add('hidden'); // Hide overlay on search
+            loading.style.display = 'block'; // Show loading spinner
+            clearMarkers();
+
+            const zipcode = document.getElementById('zipcode').value;
+            const distance = document.getElementById('distance').value;
+            const startDate = document.getElementById('start-date').value;
+            const endDate = document.getElementById('end-date').value;
+            const skillLevel = document.getElementById('skill-level').value;
+
+            const response = await fetch('/process', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ zipcode, distance, startDate, endDate, skillLevel })
+            });
+
+            const result = await response.json();
+            displayLocations(result.locations);
+            loading.style.display = 'none'; // Hide loading spinner
+        });
 
         function initMap() {
             map = new google.maps.Map(document.getElementById('map'), {
@@ -163,6 +260,7 @@
             });
         }
 
+
         document.getElementById('inputForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             clearMarkers();
@@ -170,7 +268,6 @@
             const distance = document.getElementById('distance').value;
             const startDate = document.getElementById('start-date').value;
             const endDate = document.getElementById('end-date').value;
-            const sanctioned = document.getElementById('sanctioned_only').checked;
             const skillLevel = document.getElementById('skill-level').value;
 
             const response = await fetch('/process', {
@@ -178,26 +275,18 @@
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ zipcode, distance, startDate, endDate, sanctioned, skillLevel })
+                body: JSON.stringify({ zipcode, distance, startDate, endDate, skillLevel })
             });
 
             const result = await response.json();
             displayLocations(result.locations);
         });
 
-        function getMarkerSize(registeredPlayers) {
-            const minSize = 30;
-            const maxSize = 120;
-            const maxPlayers = 800;
-            const size = Math.min(maxSize, minSize + (registeredPlayers / maxPlayers) * (maxSize - minSize));
-            return new google.maps.Size(size, size);
-        }
-
         function displayLocations(locations) {
             locations.forEach(location => {
                 const markerSize = getMarkerSize(location.registered_players);
                 const markerIcon = {
-                    url: 'https://www.pinclipart.com/picdir/big/110-1108602_havent-tried-pickleball-yet-want-to-get-more.png', // You can use a different image URL
+                    url: 'https://www.pinclipart.com/picdir/big/110-1108602_havent-tried-pickleball-yet-want-to-get-more.png',
                     scaledSize: markerSize,
                     anchor: new google.maps.Point(markerSize.width / 2, markerSize.height / 2)
                 };
@@ -222,21 +311,64 @@
                 });
 
                 marker.addListener('click', function() {
-                    if (currentInfoWindow) {
-                        currentInfoWindow.close();
-                    }
-                    infowindow.open(map, marker);
-                    currentInfoWindow = infowindow;
+                    handleMarkerClick(marker);
                 });
 
-                markers.push(marker);
+                markers.push({ marker, infowindow, size: markerSize });
             });
         }
 
-        function clearMarkers() {
-            for (let marker of markers) {
-                marker.setMap(null);
+        function handleMarkerClick(clickedMarker) {
+            // Find markers intersecting with the clicked marker
+            const intersectingMarkers = markers.filter(({ marker, size }) =>
+                calculateIntersection(clickedMarker, marker, size)
+            );
+
+            // Cycle through intersecting markers
+            if (!clickedMarker.intersectIndex) {
+                clickedMarker.intersectIndex = 0;
             }
+
+            const nextIndex = clickedMarker.intersectIndex % intersectingMarkers.length;
+            const { marker: nextMarker, infowindow } = intersectingMarkers[nextIndex];
+
+            if (currentInfoWindow) {
+                currentInfoWindow.close();
+            }
+
+            infowindow.open(map, nextMarker);
+            currentInfoWindow = infowindow;
+            clickedMarker.intersectIndex++;
+        }
+
+        function calculateIntersection(markerA, markerB, markerBSize) {
+            const projection = map.getProjection();
+            const pointA = projection.fromLatLngToPoint(markerA.getPosition());
+            const pointB = projection.fromLatLngToPoint(markerB.getPosition());
+
+            // Calculate pixel dimensions of marker
+            const pixelWidth = markerBSize.width / (2 ** map.getZoom());
+            const pixelHeight = markerBSize.height / (2 ** map.getZoom());
+
+            // Check overlap percentage
+            const xOverlap = Math.max(0, pixelWidth - Math.abs(pointA.x - pointB.x));
+            const yOverlap = Math.max(0, pixelHeight - Math.abs(pointA.y - pointB.y));
+            const overlapArea = xOverlap * yOverlap;
+
+            const markerArea = pixelWidth * pixelHeight;
+            return overlapArea / markerArea >= 0.4;
+        }
+
+        function getMarkerSize(registeredPlayers) {
+            const minSize = 30;
+            const maxSize = 120;
+            const maxPlayers = 800;
+            const size = Math.min(maxSize, minSize + (registeredPlayers / maxPlayers) * (maxSize - minSize));
+            return { width: size, height: size };
+        }
+
+        function clearMarkers() {
+            markers.forEach(({ marker }) => marker.setMap(null));
             markers = [];
         }
 

@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from flask_apscheduler import APScheduler
+#from flask_apscheduler import APScheduler
 import googlemaps
 import datamanager
 import searchbyrange
@@ -9,9 +9,9 @@ from datetime import datetime, timedelta
 
 app = Flask(__name__)
 CORS(app)
-scheduler = APScheduler()
-scheduler.init_app(app)
-scheduler.start()
+#scheduler = APScheduler()
+#scheduler.init_app(app)
+#scheduler.start()
 
 # Initialize Google Maps API client
 api_key = 'AIzaSyDWe67VvbE-aTyPUm8oOun87Xg1-KmezFU'
@@ -22,20 +22,21 @@ def index():
     return app.send_static_file('index.html')
 
 
-@scheduler.task('date', id='background')
-def background_processes():
-    datamanager.__init__()
+#@scheduler.task('date', id='background')
+#def background_processes():
+#    datamanager.__init__()
 
-@scheduler.task('cron', id='update_data', hour='23')
-def update_data():
-    datamanager.write_tournament_data_file("Future")
-    datamanager.write_coordinates()
-    datamanager.write_event_data()
-    
+#@scheduler.task('cron', id='update_data', hour='23')
+#def update_data():
+#    datamanager.write_tournament_data_file("Future")
+#    datamanager.write_coordinates()
+#    datamanager.write_event_data()
+
 
 
 @app.route('/process', methods=['POST'])
 def process():
+    datamanager.__init__()
     data = request.get_json()
     zipcode = data.get('zipcode')
     distance = data.get('distance')
@@ -49,7 +50,7 @@ def process():
 
     locations = []
     for place in places:
-        tourney_date = datetime.strptime(place['start_date'], f"%m/%d/%Y")
+        tourney_date = datetime.strptime(place['start_date'], "%m/%d/%Y")
 
         if place['registration_closed'] == 0 and datetime.strptime(start_date, "%Y-%m-%d") <= tourney_date <= datetime.strptime(end_date, "%Y-%m-%d"):
             allowed = True
@@ -58,7 +59,7 @@ def process():
                     allowed = True
                 else:
                     allowed = False
-            
+
             if allowed:
                 locations.append({
                     'title': place['title'],
@@ -77,4 +78,4 @@ def process():
     return jsonify({'locations': locations})
 
 if __name__ == '__main__':
-    app.run(debug=True) 
+    app.run()

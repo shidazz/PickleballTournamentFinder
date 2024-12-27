@@ -5,6 +5,7 @@ import json
 from Spinner import Spinner
 
 api_key = 'AIzaSyDWe67VvbE-aTyPUm8oOun87Xg1-KmezFU'
+main_dir = '/home/hickmanryan/PickleballTournamentFinder'
 
 
 def __init__():
@@ -31,7 +32,7 @@ def organize_df(df):
 
     new_df = df[['Title', 'EventActivityFirstDate', 'EventActivityLastDate', 'LocationOfEvent_City', 'LocationOfEvent_StateTitle', 'LocationOfEvent_Zip', 'LocationOfEvent_StreetAddress', 'RegistrationCount_InAtLeastOneLiveEvent', 'RegistrationCount_NotInAtLeastOneLiveEvent', 'OnlineRegistration_Active', 'IsRegClosed', 'IsPrizeMoney', 'EventID', 'Logo',
                   'Sanction_PCO', 'Sanction_SSIPA', 'Sanction_USAPA', 'Sanction_WPF', 'Sanction_GPA', 'Sanction_PC', 'Sanction_LifeTime', 'Sanction_PAA', 'Sanction_PPA', 'Sanction_APP']].copy()
-    
+
     new_df.rename(columns={
         'Title': 'title',
         'EventActivityFirstDate': 'start_date',
@@ -70,7 +71,7 @@ def organize_df(df):
     new_df.insert(len(new_df.columns), 'sanctioned', sanctioned)
 
     return new_df
-        
+
 
 def write_tournament_data_file(date_filter):
         data = []
@@ -87,22 +88,21 @@ def write_tournament_data_file(date_filter):
 
                 for i in range(len(data)):
                     events.append(data[i])
-                
+
                 pgnum += 1
-        
+
         print("Tournaments found: " + str(len(events)))
 
         with Spinner(message='Writing Tournaments to File...'):
-            filename = ('tournaments.json')
 
-            with open(filename, 'w') as f:
+            with open(f"{main_dir}/tournaments.json", 'w') as f:
                 json.dump(events, f)
 
         print("Successfully updated tournament file.")
 
 
 def read_tournament_data_file():
-    with open('tournaments.json', 'rb') as f:
+    with open(f"{main_dir}/tournaments.json", 'rb') as f:
         events = json.load(f)
         return events
 
@@ -134,7 +134,7 @@ def write_coordinates():
 
 
     with Spinner(message='Writing Coordinates to File...'):
-        with open('coordinates.txt', 'w') as f:
+        with open(f"{main_dir}/coordinates.txt", 'w') as f:
                 json.dump([address_lat, address_lng], f)
 
     print('Coordinates written to file successfully')
@@ -142,7 +142,7 @@ def write_coordinates():
 
 
 def read_coordinates():
-    with open('coordinates.txt', 'r') as f:
+    with open(f"{main_dir}/coordinates.txt", 'r') as f:
         data = json.load(f)
     return list(data)
 
@@ -153,13 +153,13 @@ def write_event_data():
 
     with Spinner(message='Writing Event Data to File'):
         for e in events:
-            with open(f'event_data/{e['event_id']}.txt', 'w') as f:
+            with open(f"{main_dir}/event_data/{e['event_id']}.txt", 'w') as f:
                 json.dump(pbs.get_event_data(e['event_id']), f)
-        
+
     print('Event data updated successfully')
 
 
 def read_event_data(event_id):
-    with open(f'event_data/{event_id}.txt', 'r') as f:
+    with open(f"{main_dir}/event_data/{event_id}.txt", 'r') as f:
         data = json.load(f)
     return data
